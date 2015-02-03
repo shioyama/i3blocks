@@ -20,5 +20,6 @@
 #define _IO_H
 
 int io_signal(int, int);
+int io_readline(int, char *, size_t);
 
 #endif /* _IO_H */

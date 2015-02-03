@@ -53,3 +53,35 @@ io_signal(int fd, int sig)
 
 	return 0;
 }
+
+static ssize_t
+read_nonblock(int fd, char *buf, size_t size)
+{
+	ssize_t nr;
+
+	nr = read(fd, buf, size);
+	if (nr == -1) {
+		if (errno == EAGAIN) {
+			/* no more reading */
+			return 0;
+		}
+
+		errorx("read from %d", fd);
+		return -1;
+	}
+
+	/* Note read(2) returns 0 for end-of-pipe */
+	return nr;
+}
+
+int
+io_readline(int fd, char *buffer, size_t size)
+{
+	int nr = 0;
+	char c;
+
+	while (nr < size && read_nonblock(fd, &c, 1) > 0 && c != '\n')
+		buffer[nr++] = c;
+
+	return nr;
+}
