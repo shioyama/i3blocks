@@ -114,6 +114,9 @@ setup_signals(void)
 	/* Click signal */
 	ADD_SIG(SIGIO);
 
+	/* I/O Possible signal for persistent blocks */
+	ADD_SIG(SIGRTMIN);
+
 	/* Real-time signals for blocks */
 	for (int sig = SIGRTMIN + 1; sig <= SIGRTMAX; ++sig) {
 		debug("provide signal %d (%s)", sig, strsignal(sig));
@@ -151,6 +154,7 @@ sched_init(struct bar *bar)
 void
 sched_start(struct bar *bar)
 {
+	siginfo_t siginfo;
 	int sig;
 
 	/*
@@ -161,7 +165,7 @@ sched_start(struct bar *bar)
 	bar_poll_timed(bar);
 
 	while (1) {
-		sig = sigwaitinfo(&sigset, NULL);
+		sig = sigwaitinfo(&sigset, &siginfo);
 		if (sig == -1) {
 			/* Hiding the bar may interrupt this system call */
 			if (errno == EINTR)
@@ -188,6 +192,11 @@ sched_start(struct bar *bar)
 		/* Block clicked? */
 		} else if (sig == SIGIO) {
 			bar_poll_clicked(bar);
+
+		/* Persistent block ready to be read? */
+		} else if (sig == SIGRTMIN) {
+			bar_poll_readable(bar, siginfo.si_fd);
+			json_print_bar(bar);
 
 		/* Blocks signaled? */
 		} else if (sig > SIGRTMIN && sig <= SIGRTMAX) {
