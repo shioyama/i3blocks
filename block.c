@@ -100,6 +100,21 @@ child_exec(struct block *block)
 }
 
 static void
+block_dump_stderr(struct block *block)
+{
+	char buf[2048] = { 0 };
+
+	/* Note read(2) returns 0 for end-of-pipe */
+	if (read(block->err, buf, sizeof(buf) - 1) == -1) {
+		berrorx(block, "read stderr");
+		return;
+	}
+
+	if (*buf)
+		bdebug(block, "stderr:\n{\n%s\n}", buf);
+}
+
+static void
 linecpy(char **lines, char *dest, size_t size)
 {
 	char *newline = strchr(*lines, '\n');
@@ -234,7 +249,6 @@ block_spawn(struct block *block, struct click *click)
 void
 block_reap(struct block *block)
 {
-	char buf[2048] = { 0 };
 	int status, code;
 
 	if (block->pid <= 0) {
@@ -254,15 +268,7 @@ block_reap(struct block *block)
 	/* Process successfully reaped, reset the block PID */
 	block->pid = 0;
 
-	/* Note read(2) returns 0 for end-of-pipe */
-	if (read(block->err, buf, sizeof(buf) - 1) == -1) {
-		berrorx(block, "read stderr");
-		mark_as_failed(block, strerror(errno));
-		goto close;
-	}
-
-	if (*buf)
-		bdebug(block, "stderr:\n{\n%s\n}", buf);
+	block_dump_stderr(block);
 
 	if (code != 0 && code != EXIT_URGENT) {
 		char reason[32];
